@@ -48,10 +48,8 @@ PhSensor phSensor(36, -6.80, 25.85);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
-#define RS485_RX 16
-#define RS485_TX 17
-#define RS485_CONTROL 4
-HardwareSerial RS485Serial(2);  // Use UART2
+#define UART_RX 16
+#define UART_TX 17
 
 String receivedData = "";
 float remote_temp = 0.0, remote_sal = 0.0, remote_ph = 0.0, remote_do = 0.0;
@@ -114,13 +112,12 @@ void connectAWS()
   Serial.println("AWS IoT Connected!");
 }
 
-void readRS485Data() {
-  while (RS485Serial.available()) {
-    char c = RS485Serial.read();
+void readUARTData() {
+  while (Serial2.available()) {
+    char c = Serial2.read();
     if (c == '\n') {
       receivedData.trim();
       Serial.println("Received: " + receivedData);
-      // Example: TEMP:28.4,SAL:230.1,PH:7.12,DO:6.87
       int tempIdx = receivedData.indexOf("TEMP:");
       int salIdx = receivedData.indexOf("SAL:");
       int phIdx = receivedData.indexOf("PH:");
@@ -137,9 +134,9 @@ void readRS485Data() {
                       remote_temp, remote_sal, remote_ph, remote_do);
       }
 
-      receivedData = ""; 
+      receivedData = "";
     } else {
-      receivedData += c;  
+      receivedData += c;
     }
   }
 }
@@ -163,13 +160,13 @@ void publishMessage()
 
   unsigned long t = millis() / 1000;
   
-  readRS485Data();
+  readUARTData();
 
   if (!hasNewData) {
-    Serial.println("No new RS-485 data. Skipping publish.");
+    Serial.println("No new UART data. Skipping publish.");
     return;
   }
-  
+
   float temp_value = remote_temp;
   float salinity_value = remote_sal;
   float ph_value = remote_ph;
@@ -214,9 +211,7 @@ void setup()
   tdsSensor.begin();
   sensors.begin();
 
-  RS485Serial.begin(9600, SERIAL_8N1, RS485_RX, RS485_TX);
-  pinMode(RS485_CONTROL, OUTPUT);
-  digitalWrite(RS485_CONTROL, LOW);  // Receive mode
+  Serial2.begin(9600, SERIAL_8N1, UART_RX, UART_TX);  // ✅ This is correct
 }
 
 void loop()

@@ -2,36 +2,32 @@
 #include <SoftwareSerial.h>
 
 #include "TdsSensor.h"
-
 #include <OneWire.h>
 #include <DallasTemperature.h>
-
 #include "PhSensor.h"
 #include "DoEstimator.h"
 
-
+// Sensor setup
 TdsSensor tdsSensor(A5, 5.0, 25.0, 30);
 PhSensor phSensor(A4, -6.80, 25.85);
-#define ONE_WIRE_BUS 2  
+#define ONE_WIRE_BUS 2
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
+// Timing
 unsigned long lastSampleTime = 0;
 const unsigned long sampleInterval = 1000;
 
-// MAX485 RS-485 communication
-#define RE_DE 8           // Direction control pin
-SoftwareSerial rs485Serial(10, 11);  // RX, TX
+// UART communication via SoftwareSerial (not RS-485)
+SoftwareSerial sensorSerial(10, 11);  // RX, TX
 
 void callSensorsValue();
-void sendViaRS485(const String& data);
+void sendViaSerial(const String& data);
 
 void setup() {
-  Serial.begin(115200);
-  rs485Serial.begin(9600);
-  pinMode(RE_DE, OUTPUT);
-  digitalWrite(RE_DE, LOW); // Default to RX
+  Serial.begin(115200);        // USB Serial for debugging
+  sensorSerial.begin(9600);    // UART to external device
 
   Serial.println("System Start ...");
 
@@ -39,15 +35,12 @@ void setup() {
   sensors.begin();
 }
 
-void sendViaRS485(const String& data) {
-  digitalWrite(RE_DE, HIGH);   // Enable TX mode
-  delay(1);                    // Wait before sending
-  rs485Serial.print(data);     // Send data
-  rs485Serial.flush();         // Wait until data sent
-  digitalWrite(RE_DE, LOW);    // Back to RX mode
+void sendViaSerial(const String& data) {
+  sensorSerial.print(data);
+  sensorSerial.flush();
 }
 
-void callSensorsValue(){
+void callSensorsValue() {
   sensors.requestTemperatures();
   float temp_value = sensors.getTempCByIndex(0);
 
@@ -64,13 +57,12 @@ void callSensorsValue(){
                    ",PH:" + String(ph_value) +
                    ",DO:" + String(do_value) + "\n";
 
-  Serial.println(payload);
-  sendViaRS485(payload);
+  Serial.println(payload);     // Print to USB serial
+  sendViaSerial(payload);     // Send to external device via TX
 }
 
 void loop() {
   unsigned long currentTime = millis();
-
   if (currentTime - lastSampleTime >= sampleInterval) {
     lastSampleTime = currentTime;
     callSensorsValue();
